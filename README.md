@@ -1,3 +1,9 @@
+Unni AI Labs – Full Stack Developer Assignment
+
+Candidate: Shubham Raj
+Role Applied: Full Stack Developer
+Submission Date: 12 Feb 2026
+
 # Company Equipment Tracker
 
 PART (A)
