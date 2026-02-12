@@ -1,8 +1,10 @@
 # Company Equipment Tracker
 
+PART (A)
+
 A production-level equipment tracking system built with React.js and Node.js, featuring role-based authentication, real-time request management, and a modern UI.
 
-## 🚀 Tech Stack
+##  Tech Stack
 
 ### Frontend
 - **React.js** (Vite) - Modern React framework
@@ -278,5 +280,160 @@ If you encounter issues:
 4. Check database connection
 
 ---
+### Part (B) solution
+Qno 1 --Issues Identified
 
-**Built with ❤️ for internship submission**
+(i).Unnecessary API Calls on Every Keystroke
+The API request is triggered on every change in the input field. This leads to excessive network calls and poor performance, especially when users type quickly.
+
+(ii).Unstable Keys in List Rendering
+Using Math.random() as a React key causes keys to change on every render, breaking React’s reconciliation process and leading to unnecessary re-renders.
+
+(iii).Lack of Error Handling & Request Cancellation
+
+No error handling if the API fails
+
+No cancellation of previous requests when the search term changes
+
+Can cause race conditions and outdated results to appear
+Qno 2--Refactor The Code
+
+import { useEffect, useState } from "react";
+
+const SearchUsers = () => {
+  const [users, setUsers] = useState([]);
+  const [term, setTerm] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!term.trim()) {
+      setUsers([]);
+      return;
+    }
+
+    const controller = new AbortController();
+    const debounceTimer = setTimeout(async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const res = await fetch(
+          `https://api.example.com/users?q=${term}`,
+          { signal: controller.signal }
+        );
+
+        const data = await res.json();
+        setUsers(data);
+      } catch (err) {
+        if (err.name !== "AbortError") {
+          setError("Failed to fetch users");
+        }
+      } finally {
+        setLoading(false);
+      }
+    }, 400); // Debounce delay
+
+    return () => {
+      clearTimeout(debounceTimer);
+      controller.abort();
+    };
+  }, [term]);
+
+  return (
+    <div>
+      <input
+        type="text"
+        value={term}
+        onChange={(e) => setTerm(e.target.value)}
+        placeholder="Search users..."
+      />
+
+      {loading && <p>Loading...</p>}
+      {error && <p style={{ color: "red" }}>{error}</p>}
+
+      {users.map((u) => (
+        <div key={u.id}>{u.name}</div>
+      ))}
+    </div>
+  );
+};
+
+export default SearchUsers;
+
+Qno 3 -- Improvements & Benefits
+Debouncing API Calls
+Prevents unnecessary requests on every keystroke, improving performance and reducing server load.
+
+Stable Keys (u.id)
+Enables React to efficiently re-render only the changed items, improving UI performance.
+
+Request Cancellation (AbortController)
+Prevents race conditions and avoids outdated API responses overriding newer results.
+
+Error & Loading States
+Improves reliability and user experience by handling failures gracefully and providing feedback during data fetch.
+
+
+Part C – Backend Debug & Security (Node.js / Express)
+
+Security Vulnerabilities & Bad Practices
+
+(i).SQL Injection Vulnerability
+User input (category) is directly concatenated into the SQL query string.
+This allows attackers to inject malicious SQL (e.g., ?category=' OR 1=1 --).
+
+(ii).Missing Authorization (Admin Access Not Enforced)
+The route is meant for admin reports, but only verifyToken is used.
+There is no role/permission check to ensure the user is actually an admin.
+
+(iii).Poor Error Handling & Response Practices
+
+Returning generic text responses ("No reports found") is inconsistent with JSON API standards
+
+Error response "Check DB" is vague and does not provide structured error information
+
+No proper HTTP status codes for empty results
+
+(iv).No Input Validation
+The category query param is not validated or sanitized before use.
+
+Qno 2--Refactored Secure Code
+
+app.get("/api/admin/reports", verifyToken, verifyAdmin, async (req, res) => {
+  const { category } = req.query;
+
+  if (!category) {
+    return res.status(400).json({ error: "Category is required" });
+  }
+
+  try {
+    const query = "SELECT * FROM reports WHERE category = $1";
+    const result = await db.query(query, [category]);
+
+    return res.status(200).json({
+      count: result.rows.length,
+      data: result.rows,
+    });
+  } catch (error) {
+    console.error("DB Error:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+Q no 3 -- Security & Reliability Improvements
+
+Prevents SQL Injection
+Using parameterized queries ($1) ensures user input is treated as data, not executable SQL.
+
+Proper Authorization (Admin-Only Access)
+verifyAdmin middleware ensures only authorized admin users can access sensitive reports.
+
+Input Validation
+Checks if category exists before querying the database, preventing unnecessary DB calls.
+
+Consistent API Responses
+Always returns structured JSON with proper HTTP status codes.
+
+Safe Error Handling
+Internal errors are logged on the server, while clients receive a generic error message to avoid leaking sensitive information.
